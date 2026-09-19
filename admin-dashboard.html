@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Grievance Operations Desk | CampusConnect</title>
+  <meta name="description" content="Central administrative console to triage, assign, and resolve campus grievance tickets.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <nav class="navbar">
+    <div class="container nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="logo-badge" style="background:linear-gradient(135deg, #ef4444, #f59e0b);">🛡️</div>
+        <span>CampusConnect <small style="font-size:0.75rem; color:#f87171; font-weight:700; text-transform:uppercase;">Admin Desk</small></span>
+      </a>
+
+      <div class="nav-actions">
+        <div id="nav-user-info"></div>
+        <button id="btn-reset-data" class="btn btn-secondary btn-sm" title="Restore sample demo data">
+          ↺ Reset Demo Data
+        </button>
+        <a href="user-dashboard.html" class="btn btn-outline btn-sm" title="Switch to Student View">
+          Student Portal 👨‍🎓
+        </a>
+        <button id="btn-logout" class="btn btn-secondary btn-sm">
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="container" style="padding-top:2rem; padding-bottom:3rem;">
+    
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Campus Grievance Redressal Center</h1>
+        <p class="page-subtitle">Departmental triage, officer assignment, status dispatching, and resolution auditing.</p>
+      </div>
+      <div>
+        <span class="badge badge-urgent" style="padding:0.45rem 0.85rem; font-size:0.85rem;">
+          ⚡ Live Resolution Service
+        </span>
+      </div>
+    </div>
+
+    <!-- Admin KPI Cards -->
+    <div class="grid-4" style="margin-bottom:2rem;">
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total Registered</div>
+          <div class="stat-value" id="admin-kpi-total">0</div>
+        </div>
+        <div class="feature-icon-box icon-indigo" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          📑
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Pending / Unassigned</div>
+          <div class="stat-value" id="admin-kpi-open" style="color:#fbbf24;">0</div>
+        </div>
+        <div class="feature-icon-box icon-amber" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          ⏳
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">In Active Progress</div>
+          <div class="stat-value" id="admin-kpi-progress" style="color:#38bdf8;">0</div>
+        </div>
+        <div class="feature-icon-box icon-blue" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          ⚙️
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Urgent Escalations</div>
+          <div class="stat-value" id="admin-kpi-urgent" style="color:#f87171;">0</div>
+        </div>
+        <div class="feature-icon-box icon-rose" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          🚨
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="filter-bar">
+      <div class="search-box">
+        <span style="color:var(--text-dim);">🔍</span>
+        <input type="text" id="admin-search" placeholder="Search by Ticket ID, complainant name, department, or keyword...">
+      </div>
+
+      <div class="filter-group">
+        <select id="admin-status-filter" class="select-control">
+          <option value="all">All Statuses</option>
+          <option value="open">Open / Pending Review</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+
+        <select id="admin-category-filter" class="select-control">
+          <option value="all">All Departments</option>
+          <option value="IT & Network Support">IT & Network Support</option>
+          <option value="Hostel & Maintenance">Hostel & Maintenance</option>
+          <option value="Academics & Examination">Academics & Examination</option>
+          <option value="Library & Digital Resources">Library & Digital Resources</option>
+          <option value="Cafeteria & Mess">Cafeteria & Mess</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Master Queue Table -->
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:130px;">ID</th>
+            <th>Grievance Summary & Complainant</th>
+            <th>Department</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Assigned Team</th>
+            <th style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="admin-tickets-body">
+          <!-- Populated by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Modal: Manage Ticket (Status / Assignment / Remark) -->
+  <div class="modal-backdrop" id="modal-manage-ticket">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="action-modal-title">Manage Ticket</h3>
+        <button class="modal-close" onclick="closeModal('modal-manage-ticket')">&times;</button>
+      </div>
+      <form id="manage-ticket-form">
+        <input type="hidden" id="action-ticket-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="action-status-select">Update Resolution Status</label>
+            <select id="action-status-select" class="form-control" required>
+              <option value="open">Open / Under Evaluation</option>
+              <option value="in_progress">In Progress / Dispatched</option>
+              <option value="resolved">Resolved (Issue Fixed)</option>
+              <option value="closed">Closed (Archived)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="action-assign-select">Assign Department / Response Unit</label>
+            <select id="action-assign-select" class="form-control" required>
+              <option value="Network Operations Team">Network Operations Team</option>
+              <option value="Electrical & HVAC Dept">Electrical & HVAC Dept</option>
+              <option value="Exam Cell Controller">Exam Cell Controller</option>
+              <option value="Library IT Helpdesk">Library IT Helpdesk</option>
+              <option value="Campus Sanitation Unit">Campus Sanitation Unit</option>
+              <option value="General Administration">General Administration</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="action-remark">Official Remark / Resolution Note</label>
+            <textarea 
+              id="action-remark" 
+              class="form-control" 
+              placeholder="e.g. Technician dispatched to site. Replacement part installed. Student notified."
+              rows="3"
+            ></textarea>
+            <small style="color:var(--text-dim); font-size:0.75rem; margin-top:0.3rem; display:block;">
+              This note will be posted to the student's ticket conversation thread and milestone log.
+            </small>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-manage-ticket')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-manage-ticket">Save & Update Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shared Ticket Details Modal -->
+  <div class="modal-backdrop" id="modal-ticket-details">
+    <div class="modal-card" style="max-width:720px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span style="font-family:var(--font-mono); color:#818cf8; font-weight:700; font-size:1.1rem;" id="detail-ticket-id">TKT-XXXX</span>
+          <div id="detail-badges" style="display:flex; gap:0.4rem;"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-ticket-details')">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <h2 id="detail-title" style="font-size:1.25rem; font-weight:700; margin-bottom:0.75rem;"></h2>
+
+        <div id="detail-stepper"></div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; background:var(--bg-input); padding:1rem; border-radius:var(--radius-md); margin-bottom:1.5rem; font-size:0.85rem;">
+          <div>
+            <div style="color:var(--text-dim); font-size:0.75rem; text-transform:uppercase;">Complainant</div>
+            <div id="detail-submitted-by" style="font-weight:600;"></div>
+          </div>
+          <div>
+            <div style="color:var(--text-dim); font-size:0.75rem; text-transform:uppercase;">Assigned Team</div>
+            <div id="detail-assigned" style="font-weight:600; color:#38bdf8;"></div>
+          </div>
+          <div>
+            <div style="color:var(--text-dim); font-size:0.75rem; text-transform:uppercase;">Location</div>
+            <div id="detail-location" style="font-weight:600;"></div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+          <h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em; margin-bottom:0.4rem;">Description</h4>
+          <p id="detail-description" style="color:var(--text-muted); font-size:0.92rem; line-height:1.6; background:rgba(255,255,255,0.02); padding:0.85rem; border-radius:var(--radius-sm); border:1px solid var(--border);"></p>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+          <h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em; margin-bottom:0.6rem;">Status Milestones</h4>
+          <div id="detail-timeline" style="border-left:2px solid var(--border); padding-left:1rem;"></div>
+        </div>
+
+        <div>
+          <h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em; margin-bottom:0.6rem;">Communication Thread</h4>
+          <div id="detail-comments-list" class="conversation-list"></div>
+
+          <form id="ticket-comment-form" style="margin-top:1rem; display:flex; gap:0.6rem;">
+            <input 
+              type="text" 
+              id="comment-input" 
+              class="form-control" 
+              placeholder="Post an official response or instructions for the student..." 
+              required
+            >
+            <button type="submit" class="btn btn-primary btn-sm" style="padding-left:1.25rem; padding-right:1.25rem;">
+              Send Reply
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-ticket-details')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p style="font-size:0.8rem; color:var(--text-dim);">
+        CampusConnect • Java Full Stack College Project (Frontend Prototype)
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

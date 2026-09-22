@@ -290,12 +290,10 @@ function initAuthPage() {
 function initUserDashboard() {
   let currentUser = window.campusStore.getCurrentUser();
   if (!currentUser) {
-    window.location.href = 'auth.html';
-    return;
-  }
-
-  // If navigating from Admin, seamlessly activate Student demo profile
-  if (currentUser.role !== 'student') {
+    window.campusStore.demoLogin('student');
+    currentUser = window.campusStore.getCurrentUser();
+  } else if (currentUser.role !== 'student') {
+    // If navigating from Admin, seamlessly activate Student demo profile
     window.campusStore.demoLogin('student');
     currentUser = window.campusStore.getCurrentUser();
     initNavbar();
@@ -516,12 +514,10 @@ function renderComments(ticket) {
 function initAdminDashboard() {
   let currentUser = window.campusStore.getCurrentUser();
   if (!currentUser) {
-    window.location.href = 'auth.html';
-    return;
-  }
-
-  // If navigating from Student, seamlessly activate Admin demo profile
-  if (currentUser.role !== 'admin') {
+    window.campusStore.demoLogin('admin');
+    currentUser = window.campusStore.getCurrentUser();
+  } else if (currentUser.role !== 'admin') {
+    // If navigating from Student, seamlessly activate Admin demo profile
     window.campusStore.demoLogin('admin');
     currentUser = window.campusStore.getCurrentUser();
     initNavbar();
@@ -536,11 +532,17 @@ function initAdminDashboard() {
 
   function updateAdminKPIs() {
     const stats = window.campusStore.getStats();
-    document.getElementById('admin-kpi-total').textContent = stats.total;
-    document.getElementById('admin-kpi-open').textContent = stats.open;
-    document.getElementById('admin-kpi-progress').textContent = stats.inProgress;
-    document.getElementById('admin-kpi-resolved').textContent = stats.resolved;
-    document.getElementById('admin-kpi-urgent').textContent = stats.urgent;
+    const elTotal = document.getElementById('admin-kpi-total');
+    const elOpen = document.getElementById('admin-kpi-open');
+    const elProgress = document.getElementById('admin-kpi-progress');
+    const elResolved = document.getElementById('admin-kpi-resolved');
+    const elUrgent = document.getElementById('admin-kpi-urgent');
+
+    if (elTotal) elTotal.textContent = stats.total;
+    if (elOpen) elOpen.textContent = stats.open;
+    if (elProgress) elProgress.textContent = stats.inProgress;
+    if (elResolved) elResolved.textContent = stats.resolved;
+    if (elUrgent) elUrgent.textContent = stats.urgent;
   }
 
   function renderAdminTable() {

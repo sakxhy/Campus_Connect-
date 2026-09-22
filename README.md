@@ -15,8 +15,14 @@ A centralized campus grievance redressal and ticket resolution portal designed f
   - Advanced search and filter controls.
 
 ## 🛠️ Tech Stack
-- **HTML5** & **Vanilla CSS3** (Custom responsive design system with dark modern glassmorphism aesthetic)
-- **JavaScript (ES6+)** with localStorage state persistence.
+- **Frontend**: HTML5, Vanilla CSS3 (Custom responsive design system with modern dark glassmorphism aesthetic), JavaScript (ES6+).
+- **Database (Ready for Backend Integration)**: MySQL / MariaDB (InnoDB, 3NF Normalized Relational Model).
+  - Schema Script: [`campus_connect_schema.sql`](campus_connect_schema.sql)
+  - Schema Design Specification: [`campus_connect_schema.pdf`](campus_connect_schema.pdf)
+
+## 📄 Evaluation Outputs
+- **Phase 1 Output Screenshots & Documentation**: [`CampusConnect_Key_Outputs.pdf`](CampusConnect_Key_Outputs.pdf)
+- High-resolution screen captures available in [`screenshots/`](screenshots/).
 
 ## 🚀 Running Locally
 You can run this project locally using Python's built-in HTTP server:
@@ -26,3 +32,4 @@ python3 -m http.server 5500
 ```
 
 Then visit: [http://localhost:5500/index.html](http://localhost:5500/index.html)
+

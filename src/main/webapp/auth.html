@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In / Register | CampusConnect</title>
+  <meta name="description" content="Access your student grievance portal or administration ticket management desk.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="container nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="logo-badge">🎓</div>
+        <span>CampusConnect</span>
+      </a>
+
+      <div class="nav-actions">
+        <a href="index.html" class="btn btn-outline btn-sm">← Back to Home</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Auth Section -->
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <div class="auth-tab active" data-target="login">Sign In</div>
+        <div class="auth-tab" data-target="register">New Student Registration</div>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="login-email">Campus Email Address</label>
+          <input 
+            type="email" 
+            id="login-email" 
+            class="form-control" 
+            placeholder="e.g. alex.student@college.edu" 
+            required 
+            value="alex.student@college.edu"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <input 
+            type="password" 
+            id="login-password" 
+            class="form-control" 
+            placeholder="Enter your password" 
+            required 
+            value="password123"
+          >
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; font-size:0.85rem;">
+          <label style="display:flex; align-items:center; gap:0.4rem; color:var(--text-muted); cursor:pointer;">
+            <input type="checkbox" checked> Remember me
+          </label>
+          <a href="#" style="color:#818cf8;" onclick="alert('For this demo, please use one of the 1-click demo buttons below.'); return false;">Forgot password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;" id="btn-submit-login">
+          Sign In to Portal
+        </button>
+      </form>
+
+      <!-- Register Form (Hidden by default) -->
+      <form id="register-form" style="display:none;">
+        <div class="form-group">
+          <label class="form-label" for="reg-name">Full Name</label>
+          <input type="text" id="reg-name" class="form-control" placeholder="e.g. Jordan Lee" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-email">College Email</label>
+          <input type="email" id="reg-email" class="form-control" placeholder="jordan@college.edu" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="reg-id">Roll / Student ID</label>
+            <input type="text" id="reg-id" class="form-control" placeholder="CS-2024-055" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reg-dept">Department</label>
+            <select id="reg-dept" class="form-control" required>
+              <option value="Computer Science">Computer Science</option>
+              <option value="Electronics & Comm">Electronics & Comm</option>
+              <option value="Mechanical Eng">Mechanical Eng</option>
+              <option value="Civil Engineering">Civil Engineering</option>
+              <option value="Business & Mgmt">Business & Mgmt</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-password">Create Password</label>
+          <input type="password" id="reg-password" class="form-control" placeholder="At least 6 characters" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;" id="btn-submit-register">
+          Create Student Account
+        </button>
+      </form>
+
+      <!-- 1-Click Demo Logins for Evaluation -->
+      <div class="demo-pills">
+        <div class="demo-pills-title">⚡ 1-Click Quick Demo Login</div>
+        <div class="demo-buttons">
+          <button type="button" class="btn btn-secondary btn-sm" id="demo-student-btn" title="Sign in as Alex Rivera (Student)">
+            👨‍🎓 Student Demo
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" id="demo-admin-btn" title="Sign in as Dr. Sarah Jenkins (Admin)">
+            🛡️ Admin Demo
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p style="font-size:0.8rem; color:var(--text-dim);">
+        CampusConnect • Java Full Stack College Project (Frontend Prototype)
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

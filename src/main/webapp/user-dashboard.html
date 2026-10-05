@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Portal | CampusConnect</title>
+  <meta name="description" content="Manage and track your campus complaints and service requests.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- Top Navbar -->
+  <nav class="navbar">
+    <div class="container nav-container">
+      <a href="index.html" class="brand-logo">
+        <div class="logo-badge">🎓</div>
+        <span>CampusConnect <small
+            style="font-size:0.75rem; color:#818cf8; font-weight:600; text-transform:uppercase;">Student
+            Desk</small></span>
+      </a>
+
+      <div class="nav-actions">
+        <div id="nav-user-info"></div>
+        <a href="admin-dashboard.html" class="btn btn-outline btn-sm" title="Switch to Admin Dashboard">
+          Switch to Admin 🛡️
+        </a>
+        <button id="btn-logout" class="btn btn-secondary btn-sm">
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <div class="container" style="padding-top:2rem; padding-bottom:3rem;">
+
+    <!-- Header with Action -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title" id="user-greeting">Welcome back, Student</h1>
+        <p class="page-subtitle">Track your filed grievances, monitor progress, and submit new service tickets.</p>
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="openModal('modal-new-ticket')" id="btn-open-new-ticket">
+          <span style="font-size:1.1rem; font-weight:bold;">+</span> File New Grievance
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI Metric Cards -->
+    <div class="grid-4" style="margin-bottom:2rem;">
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Total Submitted</div>
+          <div class="stat-value" id="kpi-total">0</div>
+        </div>
+        <div class="feature-icon-box icon-indigo" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          📂
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Pending / Open</div>
+          <div class="stat-value" id="kpi-open" style="color:#fbbf24;">0</div>
+        </div>
+        <div class="feature-icon-box icon-amber" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          ⏳
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">In Progress</div>
+          <div class="stat-value" id="kpi-progress" style="color:#38bdf8;">0</div>
+        </div>
+        <div class="feature-icon-box icon-blue" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          ⚙️
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div>
+          <div class="stat-label">Resolved</div>
+          <div class="stat-value" id="kpi-resolved" style="color:#34d399;">0</div>
+        </div>
+        <div class="feature-icon-box icon-emerald" style="margin-bottom:0; width:44px; height:44px; font-size:1.2rem;">
+          ✅
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="filter-bar">
+      <div class="search-box">
+        <span style="color:var(--text-dim);">🔍</span>
+        <input type="text" id="ticket-search" placeholder="Search your complaints by ID, title, or location...">
+      </div>
+
+      <div class="filter-group">
+        <select id="ticket-status-filter" class="select-control">
+          <option value="all">All Statuses</option>
+          <option value="open">Open / Submitted</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+
+        <select id="ticket-category-filter" class="select-control">
+          <option value="all">All Categories</option>
+          <option value="IT & Network Support">IT & Network Support</option>
+          <option value="Hostel & Maintenance">Hostel & Maintenance</option>
+          <option value="Academics & Examination">Academics & Examination</option>
+          <option value="Library & Digital Resources">Library & Digital Resources</option>
+          <option value="Cafeteria & Mess">Cafeteria & Mess</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tickets Table -->
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width:130px;">Ticket ID</th>
+            <th>Subject & Location</th>
+            <th>Category</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th style="text-align:right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tickets-table-body">
+          <!-- Populated by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Modal: File New Grievance -->
+  <div class="modal-backdrop" id="modal-new-ticket">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">📝 File a New Campus Grievance</h3>
+        <button class="modal-close" onclick="closeModal('modal-new-ticket')">&times;</button>
+      </div>
+      <form id="new-ticket-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="ticket-title">Grievance Subject / Short Summary</label>
+            <input type="text" id="ticket-title" class="form-control"
+              placeholder="e.g. Broken bench in Lecture Hall 204 or Wi-Fi unreachable" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="ticket-category">Department / Category</label>
+              <select id="ticket-category" class="form-control" required>
+                <option value="IT & Network Support">IT & Network Support</option>
+                <option value="Hostel & Maintenance">Hostel & Maintenance</option>
+                <option value="Academics & Examination">Academics & Examination</option>
+                <option value="Library & Digital Resources">Library & Digital Resources</option>
+                <option value="Cafeteria & Mess">Cafeteria & Mess</option>
+                <option value="Accounts & Finance">Accounts & Finance</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="ticket-priority">Priority Level</label>
+              <select id="ticket-priority" class="form-control" required>
+                <option value="Low">Low (General Query)</option>
+                <option value="Medium" selected>Medium (Standard Issue)</option>
+                <option value="High">High (Affects Multiple Students)</option>
+                <option value="Urgent">Urgent (Safety / Critical Academic Hazard)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ticket-location">Campus Location / Block / Room</label>
+            <input type="text" id="ticket-location" class="form-control"
+              placeholder="e.g. Hostel Block C, Room 102 or Science Wing Lab 4" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ticket-description">Detailed Description of the Issue</label>
+            <textarea id="ticket-description" class="form-control"
+              placeholder="Describe what happened, when it started, and any immediate actions taken..."
+              required></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Supporting Evidence / Attachment (Optional)</label>
+            <input type="file" class="form-control" style="padding:0.5rem; font-size:0.85rem;" accept="image/*,.pdf">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-ticket')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-ticket">Submit Grievance</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Ticket Details & Live Thread -->
+  <div class="modal-backdrop" id="modal-ticket-details">
+    <div class="modal-card" style="max-width:720px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:0.6rem;">
+          <span style="font-family:var(--font-mono); color:#818cf8; font-weight:700; font-size:1.1rem;"
+            id="detail-ticket-id">TKT-XXXX</span>
+          <div id="detail-badges" style="display:flex; gap:0.4rem;"></div>
+        </div>
+        <button class="modal-close" onclick="closeModal('modal-ticket-details')">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <h2 id="detail-title" style="font-size:1.25rem; font-weight:700; margin-bottom:0.75rem;"></h2>
+
+        <!-- Visual Stepper -->
+        <div id="detail-stepper"></div>
+
+        <!-- Meta Information Card -->
+        <div
+          style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; background:var(--bg-input); padding:1rem; border-radius:var(--radius-md); margin-bottom:1.5rem; font-size:0.85rem;">
+          <div>
+            <div style="color:var(--text-dim); font-size:0.75rem; text-transform:uppercase;">Complainant</div>
+            <div id="detail-submitted-by" style="font-weight:600;"></div>
+          </div>
+          <div>
+            <div style="color:var(--text-dim); font-size:0.75rem; text-transform:uppercase;">Assigned Team</div>
+            <div id="detail-assigned" style="font-weight:600; color:#38bdf8;"></div>
+          </div>
+          <div>
+            <div style="color:var(--text-dim); font-size:0.75rem; text-transform:uppercase;">Location</div>
+            <div id="detail-location" style="font-weight:600;"></div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div style="margin-bottom:1.5rem;">
+          <h4
+            style="font-size:0.85rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em; margin-bottom:0.4rem;">
+            Description</h4>
+          <p id="detail-description"
+            style="color:var(--text-muted); font-size:0.92rem; line-height:1.6; background:rgba(255,255,255,0.02); padding:0.85rem; border-radius:var(--radius-sm); border:1px solid var(--border);">
+          </p>
+        </div>
+
+        <!-- Timeline Log -->
+        <div style="margin-bottom:1.5rem;">
+          <h4
+            style="font-size:0.85rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em; margin-bottom:0.6rem;">
+            Status Milestones</h4>
+          <div id="detail-timeline" style="border-left:2px solid var(--border); padding-left:1rem;"></div>
+        </div>
+
+        <!-- Conversation & Responses -->
+        <div>
+          <h4
+            style="font-size:0.85rem; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.05em; margin-bottom:0.6rem;">
+            Discussion & Resolution Remarks</h4>
+          <div id="detail-comments-list" class="conversation-list"></div>
+
+          <!-- Comment Input -->
+          <form id="ticket-comment-form" style="margin-top:1rem; display:flex; gap:0.6rem;">
+            <input type="text" id="comment-input" class="form-control"
+              placeholder="Send an update or question to the assigned department..." required>
+            <button type="submit" class="btn btn-primary btn-sm" style="padding-left:1.25rem; padding-right:1.25rem;">
+              Send
+            </button>
+          </form>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-ticket-details')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p style="font-size:0.8rem; color:var(--text-dim);">
+        CampusConnect • Java Full Stack College Project (Frontend Prototype)
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>

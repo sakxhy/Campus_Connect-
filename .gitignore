@@ -1,13 +1,32 @@
-# macOS
+# ==============================================================================
+# Git Ignore - CampusConnect Project
+# ==============================================================================
+
+# Build Outputs & Packaging
+target/
+*.war
+*.class
+*.jar
+
+# Local Server & Tooling Runtimes
+.server/
+tomcat/
+work/
+temp/
+logs/
+catalina.out
+
+# macOS System Files
 .DS_Store
 .AppleDouble
 .LSOverride
 
-# IDE / Editor
+# IDE & Editor Configurations
 .vscode/
 .idea/
 *.swp
 *.swo
+*.iml
 
-# Logs
+# Runtime Logs
 *.log

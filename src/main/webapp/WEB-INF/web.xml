@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+    <display-name>CampusConnect Backend</display-name>
+    <description>CampusConnect Complaint and Ticket Management System Servlet Backend</description>
+
+    <!-- Welcome File List -->
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+    </welcome-file-list>
+
+    <!-- CORS Filter -->
+    <filter>
+        <filter-name>CorsFilter</filter-name>
+        <filter-class>com.campusconnect.filter.CorsFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>CorsFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <!-- Auth Servlet -->
+    <servlet>
+        <servlet-name>AuthServlet</servlet-name>
+        <servlet-class>com.campusconnect.controller.AuthServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AuthServlet</servlet-name>
+        <url-pattern>/api/auth/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- Ticket List and Create Servlet -->
+    <servlet>
+        <servlet-name>TicketServlet</servlet-name>
+        <servlet-class>com.campusconnect.controller.TicketServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TicketServlet</servlet-name>
+        <url-pattern>/api/tickets</url-pattern>
+    </servlet-mapping>
+
+    <!-- Ticket Detail, Status, Assign, Comments Servlet -->
+    <servlet>
+        <servlet-name>TicketDetailServlet</servlet-name>
+        <servlet-class>com.campusconnect.controller.TicketDetailServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TicketDetailServlet</servlet-name>
+        <url-pattern>/api/ticket/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- Public Track Servlet -->
+    <servlet>
+        <servlet-name>TrackServlet</servlet-name>
+        <servlet-class>com.campusconnect.controller.TrackServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>TrackServlet</servlet-name>
+        <url-pattern>/api/track</url-pattern>
+    </servlet-mapping>
+
+    <!-- Stats Servlet -->
+    <servlet>
+        <servlet-name>StatsServlet</servlet-name>
+        <servlet-class>com.campusconnect.controller.StatsServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>StatsServlet</servlet-name>
+        <url-pattern>/api/stats</url-pattern>
+    </servlet-mapping>
+
+    <!-- Reset Servlet -->
+    <servlet>
+        <servlet-name>ResetServlet</servlet-name>
+        <servlet-class>com.campusconnect.controller.ResetServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ResetServlet</servlet-name>
+        <url-pattern>/api/reset</url-pattern>
+    </servlet-mapping>
+
+    <!-- Session Timeout (60 mins) -->
+    <session-config>
+        <session-timeout>60</session-timeout>
+        <cookie-config>
+            <http-only>true</http-only>
+            <secure>false</secure>
+        </cookie-config>
+    </session-config>
+
+</web-app>

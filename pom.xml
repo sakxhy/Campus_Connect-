@@ -27,6 +27,21 @@
             <version>6.0.0</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- MySQL Connector/J for JDBC Database Operations -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.4.0</version>
+        </dependency>
+
+        <!-- JUnit 5 for Database Integration & CRUD Testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

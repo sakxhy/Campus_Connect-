@@ -2,7 +2,7 @@ package com.campusconnect;
 
 import com.campusconnect.model.*;
 import com.campusconnect.service.DataStore;
-import com.campusconnect.util.DBUtil;
+import com.campusconnect.util.DBConnection;
 import org.junit.jupiter.api.*;
 
 import java.sql.Connection;
@@ -18,13 +18,13 @@ public class DatabaseIntegrationTest {
     @BeforeAll
     public static void setUp() {
         dataStore = DataStore.getInstance();
-        assertTrue(DBUtil.isConnected(), "Database should be connected");
+        assertTrue(DBConnection.isConnected(), "Database should be connected");
     }
 
     @Test
     @Order(1)
     public void testDatabaseConnection() throws Exception {
-        try (Connection conn = DBUtil.getConnection()) {
+        try (Connection conn = DBConnection.getConnection()) {
             assertNotNull(conn);
             assertFalse(conn.isClosed());
             assertTrue(conn.isValid(2));

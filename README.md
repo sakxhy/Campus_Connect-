@@ -23,7 +23,7 @@ A centralized campus grievance redressal and ticket resolution portal designed f
 - **Backend**: Java Servlets (Jakarta EE 10 / Servlet 6.0 API), Session Management, CORS Filtering.
 - **Servlet Container / Web Server**: Apache Tomcat 10.1+.
 - **Build System**: Apache Maven (`pom.xml` -> `CampusConnect.war`).
-- **Database Model (Ready for JDBC/MySQL Integration)**: MySQL / MariaDB (InnoDB, 3NF Normalized Relational Model).
+- **Database Layer**: MySQL 8.0+ / MariaDB via JDBC (`mysql-connector-j`, InnoDB, 3NF Normalized Relational Model).
   - Schema Script: [`campus_connect_schema.sql`](campus_connect_schema.sql)
   - Schema Design Specification: [`campus_connect_schema.pdf`](campus_connect_schema.pdf)
 
@@ -43,8 +43,8 @@ A centralized campus grievance redressal and ticket resolution portal designed f
 │       │   ├── controller/     # Java Servlets (Auth, Tickets, Track, Stats, Reset)
 │       │   ├── filter/         # CORS & Preflight Filter
 │       │   ├── model/          # User, Ticket, TimelineItem, Comment, Stats
-│       │   ├── service/        # Thread-safe in-memory DataStore (Seed synced)
-│       │   └── util/           # High-performance JsonUtil
+│       │   ├── service/        # Persistent MySQL JDBC DataStore DAO
+│       │   └── util/           # DBConnection & high-performance JsonUtil
 │       └── webapp/
 │           ├── WEB-INF/web.xml # Deployment descriptor
 │           ├── css/            # Style sheets
@@ -59,8 +59,34 @@ A centralized campus grievance redressal and ticket resolution portal designed f
 
 ## 🚀 Running the Full Stack Application
 
-### 1. Start with Apache Tomcat (Recommended)
-You can start the Java Servlet backend and web portal with a single command:
+### 1. Database Setup & Configuration
+1. **Import Relational Database Schema & Seed Data**:
+   Ensure MySQL 8.0+ is running locally and import the database schema:
+   ```bash
+   mysql -u root -p < campus_connect_schema.sql
+   ```
+
+2. **Configure Environment Variables**:
+   Provide your local MySQL credentials safely via environment variables (defaults are `root` with no password):
+   ```bash
+   # Linux / macOS
+   export DB_USER="your_mysql_username"
+   export DB_PASS="your_mysql_password"
+
+   # Windows (PowerShell)
+   $env:DB_USER="your_mysql_username"
+   $env:DB_PASS="your_mysql_password"
+   ```
+   > Real passwords and credentials must never be committed to source control.
+
+### 2. Build the Project
+Compile classes, package the WAR archive, and verify the MySQL JDBC driver:
+```bash
+./build.sh
+```
+
+### 3. Start Apache Tomcat Server
+Launch the server runtime:
 
 ```bash
 ./start-server.sh

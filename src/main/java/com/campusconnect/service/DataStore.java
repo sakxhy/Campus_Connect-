@@ -1,7 +1,7 @@
 package com.campusconnect.service;
 
 import com.campusconnect.model.*;
-import com.campusconnect.util.DBUtil;
+import com.campusconnect.util.DBConnection;
 
 import java.sql.*;
 import java.time.LocalDateTime;
@@ -12,8 +12,8 @@ import java.util.logging.Logger;
 
 /**
  * Service Layer & Database Access Object for CampusConnect.
- * Replaces thread-safe in-memory collections with persistent MySQL JDBC operations.
- * Implements prepared statements, resource management, transactions, and robust exception handling.
+ * Uses MySQL JDBC operations via PreparedStatement with try-with-resources.
+ * No in-memory collections or mock data.
  */
 public class DataStore {
 
@@ -33,11 +33,11 @@ public class DataStore {
 
     private void initDatabase() {
         try {
-            if (DBUtil.isConnected()) {
+            if (DBConnection.isConnected()) {
                 LOGGER.info("Connected to MySQL database. Verifying database tables...");
                 ensureSchemaInitialized();
             } else {
-                LOGGER.warning("MySQL database not reachable on startup. Please verify db.properties or environment variables.");
+                LOGGER.warning("MySQL database not reachable on startup. Please verify DB_USER and DB_PASS environment variables.");
             }
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Error initializing database connection: " + e.getMessage(), e);
@@ -45,11 +45,11 @@ public class DataStore {
     }
 
     private void ensureSchemaInitialized() {
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              ResultSet rs = conn.getMetaData().getTables(null, null, "tickets", null)) {
             if (!rs.next()) {
                 LOGGER.info("Tables not found. Initializing schema from campus_connect_schema.sql...");
-                DBUtil.executeSqlScript("campus_connect_schema.sql");
+                DBConnection.executeSqlScript("campus_connect_schema.sql");
             }
         } catch (SQLException e) {
             LOGGER.log(Level.WARNING, "Could not check existing tables", e);
@@ -57,19 +57,19 @@ public class DataStore {
     }
 
     /**
-     * Resets database records to the default seed data defined in campus_connect_schema.sql.
+     * Resets database records by clearing tables and re-inserting the seed data from campus_connect_schema.sql.
      */
     public synchronized void resetToInitialData() {
-        LOGGER.info("Resetting database to initial seed data...");
-        boolean success = DBUtil.executeSqlScript("campus_connect_schema.sql");
+        LOGGER.info("Resetting database to initial seed data from schema...");
+        boolean success = DBConnection.executeSqlScript("campus_connect_schema.sql");
         if (!success) {
-            LOGGER.warning("Could not reset database using campus_connect_schema.sql directly from root path. Attempting fallback...");
-            DBUtil.executeSqlScript("src/main/resources/campus_connect_schema.sql");
+            LOGGER.warning("Could not reset database using root schema file. Attempting fallback...");
+            DBConnection.executeSqlScript("src/main/resources/campus_connect_schema.sql");
         }
     }
 
     /**
-     * Adds a new User (and corresponding student or admin record) within a transaction.
+     * Inserts a new user and corresponding student/admin record using PreparedStatement and transactions.
      */
     public void addUser(User u) {
         if (u == null || u.getEmail() == null) return;
@@ -78,58 +78,57 @@ public class DataStore {
         String insertStudentSql = "INSERT INTO students (user_id, student_id, department) VALUES (?, ?, ?)";
         String insertAdminSql = "INSERT INTO admins (user_id, department, title) VALUES (?, ?, ?)";
 
-        Connection conn = null;
-        PreparedStatement pUser = null;
-        PreparedStatement pRole = null;
-        ResultSet rsKeys = null;
-
-        try {
-            conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
+            try {
+                int userId = 0;
+                try (PreparedStatement pUser = conn.prepareStatement(insertUserSql, Statement.RETURN_GENERATED_KEYS)) {
+                    pUser.setString(1, u.getName() != null ? u.getName().trim() : "Unknown");
+                    pUser.setString(2, u.getEmail().trim().toLowerCase());
+                    pUser.setString(3, u.getPassword() != null ? u.getPassword() : "");
+                    pUser.setString(4, u.getRole() != null ? u.getRole().toLowerCase() : "student");
+                    pUser.setString(5, u.getPhone() != null ? u.getPhone().trim() : null);
+                    pUser.executeUpdate();
 
-            pUser = conn.prepareStatement(insertUserSql, Statement.RETURN_GENERATED_KEYS);
-            pUser.setString(1, u.getName() != null ? u.getName().trim() : "Unknown");
-            pUser.setString(2, u.getEmail().trim().toLowerCase());
-            pUser.setString(3, u.getPassword() != null ? u.getPassword() : "");
-            pUser.setString(4, u.getRole() != null ? u.getRole().toLowerCase() : "student");
-            pUser.setString(5, u.getPhone() != null ? u.getPhone().trim() : null);
+                    try (ResultSet rsKeys = pUser.getGeneratedKeys()) {
+                        if (rsKeys.next()) {
+                            userId = rsKeys.getInt(1);
+                            u.setId(String.valueOf(userId));
+                        }
+                    }
+                }
 
-            pUser.executeUpdate();
-            rsKeys = pUser.getGeneratedKeys();
+                if ("student".equalsIgnoreCase(u.getRole())) {
+                    try (PreparedStatement pStudent = conn.prepareStatement(insertStudentSql)) {
+                        pStudent.setInt(1, userId);
+                        pStudent.setString(2, u.getStudentId() != null ? u.getStudentId().trim() : "ID-" + userId);
+                        pStudent.setString(3, u.getDepartment() != null ? u.getDepartment().trim() : "General");
+                        pStudent.executeUpdate();
+                    }
+                } else if ("admin".equalsIgnoreCase(u.getRole())) {
+                    try (PreparedStatement pAdmin = conn.prepareStatement(insertAdminSql)) {
+                        pAdmin.setInt(1, userId);
+                        pAdmin.setString(2, u.getDepartment() != null ? u.getDepartment().trim() : "Campus Grievance & Operations Cell");
+                        pAdmin.setString(3, u.getTitle() != null ? u.getTitle().trim() : "Staff");
+                        pAdmin.executeUpdate();
+                    }
+                }
 
-            int userId = 0;
-            if (rsKeys.next()) {
-                userId = rsKeys.getInt(1);
-                u.setId(String.valueOf(userId));
+                conn.commit();
+                LOGGER.info("User registered successfully in database with ID: " + userId);
+            } catch (SQLException ex) {
+                conn.rollback();
+                LOGGER.log(Level.SEVERE, "Failed to insert user, transaction rolled back", ex);
+                throw new RuntimeException("Database error saving user", ex);
             }
-
-            if ("student".equalsIgnoreCase(u.getRole())) {
-                pRole = conn.prepareStatement(insertStudentSql);
-                pRole.setInt(1, userId);
-                pRole.setString(2, u.getStudentId() != null ? u.getStudentId().trim() : "ID-" + userId);
-                pRole.setString(3, u.getDepartment() != null ? u.getDepartment().trim() : "General");
-                pRole.executeUpdate();
-            } else if ("admin".equalsIgnoreCase(u.getRole())) {
-                pRole = conn.prepareStatement(insertAdminSql);
-                pRole.setInt(1, userId);
-                pRole.setString(2, u.getDepartment() != null ? u.getDepartment().trim() : "Campus Grievance & Operations Cell");
-                pRole.setString(3, u.getTitle() != null ? u.getTitle().trim() : "Staff");
-                pRole.executeUpdate();
-            }
-
-            conn.commit();
-            LOGGER.info("User registered successfully in database with ID: " + userId);
         } catch (SQLException e) {
-            DBUtil.rollback(conn);
-            LOGGER.log(Level.SEVERE, "Failed to insert user: " + u.getEmail(), e);
-            throw new RuntimeException("Database error saving user", e);
-        } finally {
-            DBUtil.close(rsKeys, pUser, pRole, conn);
+            LOGGER.log(Level.SEVERE, "Database connection error in addUser: " + u.getEmail(), e);
+            throw new RuntimeException("Database error connecting to save user", e);
         }
     }
 
     /**
-     * Finds a user by email address, fetching polymorphic student or admin fields.
+     * Finds a user by email address, fetching student or admin details via JOIN.
      */
     public User getUserByEmail(String email) {
         if (email == null || email.trim().isEmpty()) return null;
@@ -141,7 +140,7 @@ public class DataStore {
                 "LEFT JOIN admins a ON u.user_id = a.user_id " +
                 "WHERE LOWER(u.email) = LOWER(?)";
 
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email.trim().toLowerCase());
             try (ResultSet rs = ps.executeQuery()) {
@@ -161,7 +160,6 @@ public class DataStore {
     public User getUserById(String id) {
         if (id == null || id.trim().isEmpty()) return null;
 
-        // Support string demo IDs from previous implementation
         if ("usr_student_1".equalsIgnoreCase(id.trim())) return getUserByEmail("alex.student@college.edu");
         if ("usr_admin_1".equalsIgnoreCase(id.trim())) return getUserByEmail("admin@college.edu");
         if ("usr_student_2".equalsIgnoreCase(id.trim())) return getUserByEmail("priya.s@college.edu");
@@ -180,7 +178,7 @@ public class DataStore {
                 "LEFT JOIN admins a ON u.user_id = a.user_id " +
                 "WHERE u.user_id = ?";
 
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, numericId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -206,7 +204,7 @@ public class DataStore {
                 "LEFT JOIN admins a ON u.user_id = a.user_id " +
                 "WHERE LOWER(u.role) = LOWER(?) ORDER BY u.user_id ASC LIMIT 1";
 
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, roleStr);
             try (ResultSet rs = ps.executeQuery()) {
@@ -263,7 +261,7 @@ public class DataStore {
 
         sql.append("ORDER BY t.created_at DESC");
 
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             for (int i = 0; i < params.size(); i++) {
                 ps.setObject(i + 1, params.get(i));
@@ -297,7 +295,7 @@ public class DataStore {
                 "LEFT JOIN students s ON u.user_id = s.user_id " +
                 "WHERE LOWER(t.ticket_id) = LOWER(?)";
 
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, id.trim());
             try (ResultSet rs = ps.executeQuery()) {
@@ -317,60 +315,60 @@ public class DataStore {
      * Creates a new ticket grievance with automatic sequential ID generation and initial audit timeline.
      */
     public synchronized Ticket createTicket(String title, String category, String priority, String location, String description, User user) {
-        Connection conn = null;
-        try {
-            conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
+            try {
+                // 1. Generate sequential Ticket ID
+                String ticketId = generateNextTicketId(conn);
 
-            // 1. Generate sequential Ticket ID
-            String ticketId = generateNextTicketId(conn);
+                // 2. Resolve Category ID
+                int categoryId = resolveCategoryId(conn, category);
 
-            // 2. Resolve Category ID
-            int categoryId = resolveCategoryId(conn, category);
+                // 3. Resolve Submitting User ID
+                int submitterId = resolveUserId(conn, user);
 
-            // 3. Resolve Submitting User ID
-            int submitterId = resolveUserId(conn, user);
+                String finalPriority = priority != null && !priority.trim().isEmpty() ? priority.trim() : "Medium";
+                String finalLocation = location != null && !location.trim().isEmpty() ? location.trim() : "Campus Premises";
+                String finalTitle = title != null && !title.trim().isEmpty() ? title.trim() : "Untitled Grievance";
+                String finalDesc = description != null ? description.trim() : "";
 
-            String finalPriority = priority != null && !priority.trim().isEmpty() ? priority.trim() : "Medium";
-            String finalLocation = location != null && !location.trim().isEmpty() ? location.trim() : "Campus Premises";
-            String finalTitle = title != null && !title.trim().isEmpty() ? title.trim() : "Untitled Grievance";
-            String finalDesc = description != null ? description.trim() : "";
+                // 4. Insert Ticket
+                String insertTicketSql = "INSERT INTO tickets " +
+                        "(ticket_id, title, description, category_id, priority, status, location, submitted_by, assigned_to, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, ?, ?, 'open', ?, ?, 'Pending Assignment', NOW(), NOW())";
 
-            // 4. Insert Ticket
-            String insertTicketSql = "INSERT INTO tickets " +
-                    "(ticket_id, title, description, category_id, priority, status, location, submitted_by, assigned_to, created_at, updated_at) " +
-                    "VALUES (?, ?, ?, ?, ?, 'open', ?, ?, 'Pending Assignment', NOW(), NOW())";
+                try (PreparedStatement pt = conn.prepareStatement(insertTicketSql)) {
+                    pt.setString(1, ticketId);
+                    pt.setString(2, finalTitle);
+                    pt.setString(3, finalDesc);
+                    pt.setInt(4, categoryId);
+                    pt.setString(5, finalPriority);
+                    pt.setString(6, finalLocation);
+                    pt.setInt(7, submitterId);
+                    pt.executeUpdate();
+                }
 
-            try (PreparedStatement pt = conn.prepareStatement(insertTicketSql)) {
-                pt.setString(1, ticketId);
-                pt.setString(2, finalTitle);
-                pt.setString(3, finalDesc);
-                pt.setInt(4, categoryId);
-                pt.setString(5, finalPriority);
-                pt.setString(6, finalLocation);
-                pt.setInt(7, submitterId);
-                pt.executeUpdate();
+                // 5. Insert initial timeline item
+                String insertTimelineSql = "INSERT INTO ticket_timeline (ticket_id, status, label, event_date, note) VALUES (?, 'open', ?, NOW(), ?)";
+                try (PreparedStatement ptime = conn.prepareStatement(insertTimelineSql)) {
+                    ptime.setString(1, ticketId);
+                    ptime.setString(2, "Ticket Submitted");
+                    ptime.setString(3, "New grievance logged by student.");
+                    ptime.executeUpdate();
+                }
+
+                conn.commit();
+                LOGGER.info("Created new grievance ticket: " + ticketId);
+                return getTicketById(ticketId);
+
+            } catch (SQLException ex) {
+                conn.rollback();
+                LOGGER.log(Level.SEVERE, "Failed to create ticket, rolled back: " + title, ex);
+                throw new RuntimeException("Database error creating ticket", ex);
             }
-
-            // 5. Insert initial timeline item
-            String insertTimelineSql = "INSERT INTO ticket_timeline (ticket_id, status, label, event_date, note) VALUES (?, 'open', ?, NOW(), ?)";
-            try (PreparedStatement ptime = conn.prepareStatement(insertTimelineSql)) {
-                ptime.setString(1, ticketId);
-                ptime.setString(2, "Ticket Submitted");
-                ptime.setString(3, "New grievance logged by student.");
-                ptime.executeUpdate();
-            }
-
-            conn.commit();
-            LOGGER.info("Created new grievance ticket: " + ticketId);
-            return getTicketById(ticketId);
-
         } catch (SQLException e) {
-            DBUtil.rollback(conn);
-            LOGGER.log(Level.SEVERE, "Failed to create ticket: " + title, e);
-            throw new RuntimeException("Database error creating ticket", e);
-        } finally {
-            DBUtil.close(conn);
+            LOGGER.log(Level.SEVERE, "Database connection error creating ticket: " + title, e);
+            throw new RuntimeException("Database connection error creating ticket", e);
         }
     }
 
@@ -380,59 +378,59 @@ public class DataStore {
     public synchronized Ticket updateTicketStatus(String id, String newStatus, String adminNote, User admin) {
         if (id == null || newStatus == null) return null;
 
-        Connection conn = null;
-        try {
-            conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
-
-            String statusNorm = newStatus.trim().toLowerCase();
-            String updateSql = "UPDATE tickets SET status = ?, updated_at = NOW() WHERE LOWER(ticket_id) = LOWER(?)";
-            try (PreparedStatement pu = conn.prepareStatement(updateSql)) {
-                pu.setString(1, statusNorm);
-                pu.setString(2, id.trim());
-                int affected = pu.executeUpdate();
-                if (affected == 0) {
-                    conn.rollback();
-                    return null;
+            try {
+                String statusNorm = newStatus.trim().toLowerCase();
+                String updateSql = "UPDATE tickets SET status = ?, updated_at = NOW() WHERE LOWER(ticket_id) = LOWER(?)";
+                try (PreparedStatement pu = conn.prepareStatement(updateSql)) {
+                    pu.setString(1, statusNorm);
+                    pu.setString(2, id.trim());
+                    int affected = pu.executeUpdate();
+                    if (affected == 0) {
+                        conn.rollback();
+                        return null;
+                    }
                 }
-            }
 
-            String label = "Status Updated";
-            if ("open".equalsIgnoreCase(statusNorm)) label = "Status reset to Open";
-            else if ("in_progress".equalsIgnoreCase(statusNorm)) label = "Marked In-Progress";
-            else if ("resolved".equalsIgnoreCase(statusNorm)) label = "Ticket Resolved";
-            else if ("closed".equalsIgnoreCase(statusNorm)) label = "Ticket Closed";
+                String label = "Status Updated";
+                if ("open".equalsIgnoreCase(statusNorm)) label = "Status reset to Open";
+                else if ("in_progress".equalsIgnoreCase(statusNorm)) label = "Marked In-Progress";
+                else if ("resolved".equalsIgnoreCase(statusNorm)) label = "Ticket Resolved";
+                else if ("closed".equalsIgnoreCase(statusNorm)) label = "Ticket Closed";
 
-            String note = adminNote != null && !adminNote.trim().isEmpty() ? adminNote.trim() : "Status updated to " + statusNorm;
-            String timelineSql = "INSERT INTO ticket_timeline (ticket_id, status, label, event_date, note) VALUES (?, ?, ?, NOW(), ?)";
-            try (PreparedStatement pt = conn.prepareStatement(timelineSql)) {
-                pt.setString(1, id.trim());
-                pt.setString(2, statusNorm);
-                pt.setString(3, label);
-                pt.setString(4, note);
-                pt.executeUpdate();
-            }
-
-            if (adminNote != null && !adminNote.trim().isEmpty()) {
-                int authorId = resolveAdminUserId(conn, admin);
-                String commentSql = "INSERT INTO ticket_comments (ticket_id, author_id, role, comment_text, comment_date) VALUES (?, ?, 'admin', ?, NOW())";
-                try (PreparedStatement pc = conn.prepareStatement(commentSql)) {
-                    pc.setString(1, id.trim());
-                    pc.setInt(2, authorId);
-                    pc.setString(3, "[Status Update: " + statusNorm.toUpperCase() + "] " + adminNote.trim());
-                    pc.executeUpdate();
+                String note = adminNote != null && !adminNote.trim().isEmpty() ? adminNote.trim() : "Status updated to " + statusNorm;
+                String timelineSql = "INSERT INTO ticket_timeline (ticket_id, status, label, event_date, note) VALUES (?, ?, ?, NOW(), ?)";
+                try (PreparedStatement pt = conn.prepareStatement(timelineSql)) {
+                    pt.setString(1, id.trim());
+                    pt.setString(2, statusNorm);
+                    pt.setString(3, label);
+                    pt.setString(4, note);
+                    pt.executeUpdate();
                 }
+
+                if (adminNote != null && !adminNote.trim().isEmpty()) {
+                    int authorId = resolveAdminUserId(conn, admin);
+                    String commentSql = "INSERT INTO ticket_comments (ticket_id, author_id, role, comment_text, comment_date) VALUES (?, ?, 'admin', ?, NOW())";
+                    try (PreparedStatement pc = conn.prepareStatement(commentSql)) {
+                        pc.setString(1, id.trim());
+                        pc.setInt(2, authorId);
+                        pc.setString(3, "[Status Update: " + statusNorm.toUpperCase() + "] " + adminNote.trim());
+                        pc.executeUpdate();
+                    }
+                }
+
+                conn.commit();
+                return getTicketById(id);
+
+            } catch (SQLException ex) {
+                conn.rollback();
+                LOGGER.log(Level.SEVERE, "Failed to update ticket status for: " + id, ex);
+                throw new RuntimeException("Database error updating ticket status", ex);
             }
-
-            conn.commit();
-            return getTicketById(id);
-
         } catch (SQLException e) {
-            DBUtil.rollback(conn);
-            LOGGER.log(Level.SEVERE, "Failed to update ticket status for: " + id, e);
-            throw new RuntimeException("Database error updating ticket status", e);
-        } finally {
-            DBUtil.close(conn);
+            LOGGER.log(Level.SEVERE, "Database connection error updating ticket status for: " + id, e);
+            throw new RuntimeException("Database connection error updating ticket status", e);
         }
     }
 
@@ -442,102 +440,101 @@ public class DataStore {
     public synchronized Ticket assignTicket(String id, String assignee) {
         if (id == null || assignee == null || assignee.trim().isEmpty()) return null;
 
-        Connection conn = null;
-        try {
-            conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
-
-            String selectStatusSql = "SELECT status FROM tickets WHERE LOWER(ticket_id) = LOWER(?)";
-            String curStatus = "open";
-            try (PreparedStatement ps = conn.prepareStatement(selectStatusSql)) {
-                ps.setString(1, id.trim());
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        curStatus = rs.getString("status");
-                    } else {
-                        conn.rollback();
-                        return null;
+            try {
+                String selectStatusSql = "SELECT status FROM tickets WHERE LOWER(ticket_id) = LOWER(?)";
+                String curStatus = "open";
+                try (PreparedStatement ps = conn.prepareStatement(selectStatusSql)) {
+                    ps.setString(1, id.trim());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            curStatus = rs.getString("status");
+                        } else {
+                            conn.rollback();
+                            return null;
+                        }
                     }
                 }
+
+                String targetStatus = "open".equalsIgnoreCase(curStatus) ? "in_progress" : curStatus;
+                String updateSql = "UPDATE tickets SET assigned_to = ?, status = ?, updated_at = NOW() WHERE LOWER(ticket_id) = LOWER(?)";
+                try (PreparedStatement pu = conn.prepareStatement(updateSql)) {
+                    pu.setString(1, assignee.trim());
+                    pu.setString(2, targetStatus);
+                    pu.setString(3, id.trim());
+                    pu.executeUpdate();
+                }
+
+                String timelineSql = "INSERT INTO ticket_timeline (ticket_id, status, label, event_date, note) VALUES (?, ?, 'Ticket Assigned', NOW(), ?)";
+                try (PreparedStatement pt = conn.prepareStatement(timelineSql)) {
+                    pt.setString(1, id.trim());
+                    pt.setString(2, targetStatus);
+                    pt.setString(3, "Assigned to: " + assignee.trim());
+                    pt.executeUpdate();
+                }
+
+                conn.commit();
+                return getTicketById(id);
+
+            } catch (SQLException ex) {
+                conn.rollback();
+                LOGGER.log(Level.SEVERE, "Failed to assign ticket: " + id, ex);
+                throw new RuntimeException("Database error assigning ticket", ex);
             }
-
-            String targetStatus = "open".equalsIgnoreCase(curStatus) ? "in_progress" : curStatus;
-            String updateSql = "UPDATE tickets SET assigned_to = ?, status = ?, updated_at = NOW() WHERE LOWER(ticket_id) = LOWER(?)";
-            try (PreparedStatement pu = conn.prepareStatement(updateSql)) {
-                pu.setString(1, assignee.trim());
-                pu.setString(2, targetStatus);
-                pu.setString(3, id.trim());
-                pu.executeUpdate();
-            }
-
-            String timelineSql = "INSERT INTO ticket_timeline (ticket_id, status, label, event_date, note) VALUES (?, ?, 'Ticket Assigned', NOW(), ?)";
-            try (PreparedStatement pt = conn.prepareStatement(timelineSql)) {
-                pt.setString(1, id.trim());
-                pt.setString(2, targetStatus);
-                pt.setString(3, "Assigned to: " + assignee.trim());
-                pt.executeUpdate();
-            }
-
-            conn.commit();
-            return getTicketById(id);
-
         } catch (SQLException e) {
-            DBUtil.rollback(conn);
-            LOGGER.log(Level.SEVERE, "Failed to assign ticket: " + id, e);
-            throw new RuntimeException("Database error assigning ticket", e);
-        } finally {
-            DBUtil.close(conn);
+            LOGGER.log(Level.SEVERE, "Database connection error assigning ticket: " + id, e);
+            throw new RuntimeException("Database connection error assigning ticket", e);
         }
     }
 
     /**
-     * Appends a comment to a ticket thread.
+     * Appends a comment to a ticket thread using PreparedStatement and transactions.
      */
     public synchronized Comment addComment(String ticketId, String text, User user) {
         if (ticketId == null || text == null || text.trim().isEmpty()) return null;
 
-        Connection conn = null;
-        PreparedStatement pc = null;
-        ResultSet rsKey = null;
-
-        try {
-            conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection()) {
             conn.setAutoCommit(false);
+            try {
+                int authorId = resolveUserId(conn, user);
+                String role = (user != null && user.getRole() != null) ? user.getRole().toLowerCase() : "student";
+                String authorName = (user != null && user.getName() != null) ? user.getName() : "Anonymous";
+                String displayNow = LocalDateTime.now().format(DISPLAY_FMT);
+                int commentId = 0;
 
-            int authorId = resolveUserId(conn, user);
-            String role = (user != null && user.getRole() != null) ? user.getRole().toLowerCase() : "student";
-            String authorName = (user != null && user.getName() != null) ? user.getName() : "Anonymous";
-            String displayNow = LocalDateTime.now().format(DISPLAY_FMT);
+                String commentSql = "INSERT INTO ticket_comments (ticket_id, author_id, role, comment_text, comment_date) VALUES (?, ?, ?, ?, NOW())";
+                try (PreparedStatement pc = conn.prepareStatement(commentSql, Statement.RETURN_GENERATED_KEYS)) {
+                    pc.setString(1, ticketId.trim());
+                    pc.setInt(2, authorId);
+                    pc.setString(3, role);
+                    pc.setString(4, text.trim());
+                    pc.executeUpdate();
 
-            String commentSql = "INSERT INTO ticket_comments (ticket_id, author_id, role, comment_text, comment_date) VALUES (?, ?, ?, ?, NOW())";
-            pc = conn.prepareStatement(commentSql, Statement.RETURN_GENERATED_KEYS);
-            pc.setString(1, ticketId.trim());
-            pc.setInt(2, authorId);
-            pc.setString(3, role);
-            pc.setString(4, text.trim());
-            pc.executeUpdate();
+                    try (ResultSet rsKey = pc.getGeneratedKeys()) {
+                        if (rsKey.next()) {
+                            commentId = rsKey.getInt(1);
+                        }
+                    }
+                }
 
-            rsKey = pc.getGeneratedKeys();
-            int commentId = 0;
-            if (rsKey.next()) {
-                commentId = rsKey.getInt(1);
+                String updateTicketSql = "UPDATE tickets SET updated_at = NOW() WHERE LOWER(ticket_id) = LOWER(?)";
+                try (PreparedStatement pu = conn.prepareStatement(updateTicketSql)) {
+                    pu.setString(1, ticketId.trim());
+                    pu.executeUpdate();
+                }
+
+                conn.commit();
+                return new Comment("c" + commentId, authorName, role, text.trim(), displayNow);
+
+            } catch (SQLException ex) {
+                conn.rollback();
+                LOGGER.log(Level.SEVERE, "Failed to add comment to ticket: " + ticketId, ex);
+                throw new RuntimeException("Database error adding comment", ex);
             }
-
-            String updateTicketSql = "UPDATE tickets SET updated_at = NOW() WHERE LOWER(ticket_id) = LOWER(?)";
-            try (PreparedStatement pu = conn.prepareStatement(updateTicketSql)) {
-                pu.setString(1, ticketId.trim());
-                pu.executeUpdate();
-            }
-
-            conn.commit();
-            return new Comment("c" + commentId, authorName, role, text.trim(), displayNow);
-
         } catch (SQLException e) {
-            DBUtil.rollback(conn);
-            LOGGER.log(Level.SEVERE, "Failed to add comment to ticket: " + ticketId, e);
-            throw new RuntimeException("Database error adding comment", e);
-        } finally {
-            DBUtil.close(rsKey, pc, conn);
+            LOGGER.log(Level.SEVERE, "Database connection error adding comment to ticket: " + ticketId, e);
+            throw new RuntimeException("Database connection error adding comment", e);
         }
     }
 
@@ -554,7 +551,7 @@ public class DataStore {
                 "COALESCE(SUM(CASE WHEN LOWER(priority) = 'urgent' AND LOWER(status) NOT IN ('resolved', 'closed') THEN 1 ELSE 0 END), 0) AS urgent_count " +
                 "FROM tickets";
 
-        try (Connection conn = DBUtil.getConnection();
+        try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
@@ -580,7 +577,6 @@ public class DataStore {
 
     private User mapUserFromResultSet(ResultSet rs) throws SQLException {
         String password = rs.getString("password_hash");
-        // Normalize demo hash passwords to their plain-text equivalents for login compatibility
         if ("$2a$12$e8x/demo_hash_student_password123".equals(password)) {
             password = "password123";
         } else if ("$2a$12$e8x/demo_hash_admin_admin123".equals(password)) {
@@ -628,7 +624,6 @@ public class DataStore {
     }
 
     private void loadTicketTimelineAndComments(Connection conn, Ticket t) {
-        // Load Timeline
         String timeSql = "SELECT status, label, event_date, note FROM ticket_timeline WHERE ticket_id = ? ORDER BY event_date ASC, timeline_id ASC";
         try (PreparedStatement ps = conn.prepareStatement(timeSql)) {
             ps.setString(1, t.getId());
@@ -648,7 +643,6 @@ public class DataStore {
             LOGGER.log(Level.WARNING, "Failed to load timeline for ticket: " + t.getId(), e);
         }
 
-        // Load Comments
         String commentSql = "SELECT c.comment_id, u.name AS author_name, c.role, c.comment_text, c.comment_date " +
                 "FROM ticket_comments c " +
                 "JOIN users u ON c.author_id = u.user_id " +
@@ -709,7 +703,6 @@ public class DataStore {
             }
         }
 
-        // If category does not exist, insert it
         String insertSql = "INSERT INTO categories (name) VALUES (?)";
         try (PreparedStatement pi = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
             pi.setString(1, name);
@@ -735,7 +728,6 @@ public class DataStore {
                 }
             }
         }
-        // Fallback: pick first available student or user
         String fallbackSql = "SELECT user_id FROM users ORDER BY user_id ASC LIMIT 1";
         try (Statement s = conn.createStatement();
              ResultSet rs = s.executeQuery(fallbackSql)) {
@@ -758,7 +750,6 @@ public class DataStore {
                 }
             }
         }
-        // Fallback admin: pick admin user
         String fallbackSql = "SELECT user_id FROM users WHERE role = 'admin' LIMIT 1";
         try (Statement s = conn.createStatement();
              ResultSet rs = s.executeQuery(fallbackSql)) {

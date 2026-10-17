@@ -30,3 +30,7 @@ catalina.out
 
 # Runtime Logs
 *.log
+
+# Database Secrets & Credentials
+db.properties
+src/main/resources/db.properties

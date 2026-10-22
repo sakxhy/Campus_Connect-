@@ -101,14 +101,39 @@ To stop the server:
 ./stop-server.sh
 ```
 
-### 2. Building from Source
-To recompile Java classes and rebuild the WAR bundle:
+---
 
+## 🌐 Public Deployment Guide
+
+CampusConnect can be deployed publicly using multiple turnkey options:
+
+### Option A: Instant Live Public URL (Cloudflare Tunnel)
+You can instantly expose your local Tomcat server to the global internet over secure HTTPS with zero server setup:
 ```bash
-./build.sh
+cloudflared tunnel --url http://localhost:8090
 ```
+This outputs a public URL (e.g., `https://your-tunnel-name.trycloudflare.com`) accessible from any browser or smartphone worldwide.
 
-Target WAR file generated at: `target/CampusConnect.war`
+### Option B: 24/7 Cloud Hosting (Render / Railway with Docker)
+A production multi-stage [`Dockerfile`](Dockerfile) is pre-configured with Tomcat 10.1 and Java 17:
+1. Push your code to GitHub: `git push origin main`.
+2. On **[Render](https://render.com)** or **[Railway](https://railway.app)**:
+   - Create a **New Web Service** from your GitHub repository `Campus_Connect-`.
+   - Select runtime: **Docker** (uses repository `Dockerfile` and `render.yaml`).
+   - (Optional) Connect a managed MySQL database and add environment variables:
+     - `DB_URL`: `jdbc:mysql://<host>:<port>/<dbname>?useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC`
+     - `DB_USER`: `<username>`
+     - `DB_PASS`: `<password>`
+   - If no MySQL is connected, CampusConnect automatically runs with its resilient in-memory store so the app is always live and functional.
+
+### Option C: GitHub Pages (Frontend & Client-Side Interactive Demo)
+The frontend (`index.html`, `auth.html`, `user-dashboard.html`, `admin-dashboard.html`) includes built-in offline synchronization with demo data:
+1. Go to your GitHub repository **Settings** > **Pages**.
+2. Under **Build and deployment**, select source: **Deploy from a branch**.
+3. Choose branch `main` and folder `/ (root)`, then click **Save**.
+4. Your site will be published at: `https://<username>.github.io/Campus_Connect-/`.
+
+---
 
 ---
 

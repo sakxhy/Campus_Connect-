@@ -1,0 +1,8 @@
+.git
+.gitignore
+.server/
+target/
+*.log
+*.pdf
+CAMPUS_CONNECT_PROJECT_REPORT.txt
+screenshots/
